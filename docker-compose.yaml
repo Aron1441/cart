@@ -1,0 +1,76 @@
+version: "3.3"
+
+services:
+  api:
+    build:
+      context: api/docker/development/nginx
+    ports:
+      - "8081:80"
+    depends_on:
+      - api-php-fpm
+    volumes:
+      - ./api:/app
+    networks:
+      - network2
+
+  api-php-fpm:
+    build:
+      context: api/docker/development/php-fpm
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./api:/app
+    environment:
+    - REDIS_PASSWORD=${REDIS_PASSWORD}
+    networks:
+      - network2
+
+  mysql:
+    image: mysql:8.0.29
+    container_name: tools_php-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=s123123
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - network2
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: tools_php-phpmyadmin
+    restart: unless-stopped
+    environment:
+      - PMA_ARBITRARY=1
+      - UPLOAD_LIMIT=1024M
+      - MEMORY_LIMIT=1024M
+      - MAX_EXECUTION_TIME=300
+    ports:
+      - "8082:80"
+    depends_on:
+      - mysql
+    networks:
+      - network2
+
+  redis:
+    image: redis:latest
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - /api/docker/development/redis:/root/redis
+      - /api/docker/development/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: ["sh", "-c", "exec redis-server --requirepass \"${REDIS_PASSWORD}\""]
+    environment:
+      - REDIS_PASSWORD=my-password
+      - REDIS_PORT=6379
+      - REDIS_DATABASES=16
+    networks:
+      - network2
+
+volumes:
+  mysql-data:
+
+networks:
+  network2:
+    driver: bridge
